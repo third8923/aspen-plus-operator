@@ -19,3 +19,17 @@ results/
 .idea/
 .vscode/
 *.swp
+
+# WorkBuddy 工作区数据（本地）
+.workbuddy/
+
+# 内部工作区：批量取证/探针的临时产物，不入库
+_workshop/
+_research_armstrong/
+_audit/
+_probe.py
+_probe.txt
+
+# 除外：已定稿的专家工作区文档（按需显式入库）
+!_workshop/*.md
+!references/pattern-index.csv

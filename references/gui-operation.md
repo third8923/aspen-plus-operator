@@ -2,6 +2,24 @@
 
 本文是 Aspen GUI 路径的唯一权威操作规范。**执行任何 GUI 操作前必须完整读一遍。**
 
+## 0-WB WorkBuddy 环境适配（在本环境优先看这条）
+
+本文正文里的「豆包虚拟桌面 / computer_use `list_apps`+`launch_app`」是**另一套 agent 环境**的通道名。
+在 **WorkBuddy** 下对应做法：
+
+| 本文写法 | WorkBuddy 对应 |
+|-|-|
+| computer_use `list_apps` / `launch_app` / 截图 | 加载 **`workbuddy-computer-use`** skill（控制 Windows 桌面应用：点击、输入、截图） |
+| 豆包虚拟桌面（用户可见会话） | WorkBuddy 的桌面控制通道；**仍需先确认目标窗口在用户可见的会话里** |
+
+不变的原则（两个环境都成立）：
+
+1. **COM 优先**：批量跑工况、取数、参数寻优一律走 Python win32com，不开 GUI。
+2. **GUI 只用于**：看引擎报错原文、单点演示/教学、确认界面状态。
+3. **报错文本其实可以不开 GUI**：`doc.Export(2, "<路径>.rep")`（`HAPEXP_REPORT=2`）直接导出报告，
+   `doc.Export(6, "...")`（`HAPEXP_RUNMSG=6`）导出运行消息——**优先用这个，别为一个弹窗去开 GUI**。
+4. GUI 与 COM 是两个独立会话，**交换介质只有同一个 bkp 文件**（GUI 保存 → COM 重开重跑）。
+
 ## 0. 通道分界（先于一切）
 
 | 操作 | 启动位置 | 通道 | 用户是否可见 |

@@ -1,6 +1,6 @@
 ---
 name: aspen-plus-operator
-description: Aspen Plus V14 自动化建模与 GUI 操作技能（生产实战沉淀）。用 COM 驱动引擎批量建模/工况扫描/参数寻优、bkp 文本层诊断修复、Excel 三插件（ASW/APXL/Calc+VBA）联动、GUI 启动与排错验证、单位制切换（原生 SI 单位集，Output 直读 °C/kg/h/kW）与英制→SI 换算。适用于：用 Aspen 做精馏/反应/分离流程模拟与降本增效分析、跑批量工况、修损坏模型、读引擎报错定位根因、本地 GUI 启动与排错、把模型结果换算成国内 SI 单位汇报。
+description: Aspen Plus V14 自动化建模、COM 批量求解、bkp 文本层诊断与单位代码破译技能（生产实战沉淀）。用 COM 驱动引擎批量建模/工况扫描/参数寻优、bkp 文本层诊断修复、Excel 三插件（ASW/APXL/Calc+VBA）联动、GUI 启动与排错验证；独家包含 bkp 单位代码字典（<维度> <子码> 两级结构，203 个官方 bkp 实测）、COM 单位安全读写（UnitString/SetValueAndUnit）、水饱和压 Psat 与全液相窗口判定；另含官方物性方法决策树（活度系数法 10 atm 上限警告）、203 个官方示例流程模式库、收敛失败诊断手册（CVSTAT/SENSSTAT 纯 COM 判定收敛）。适用于：Aspen 工况扫描、灵敏度分析、RStoic 固定转化率模型核查、反应器是否还有液相、精馏/水解/生物柴油流程模拟与降本增效、修损坏模型、读引擎报错定位根因、英制→SI 换算与国内口径汇报。触发词：Aspen、bkp、Aspen COM、Apwn.Document、Engine.Run2、RStoic、工况扫描、单位代码、汽化率、Psat、物性方法选择、不收敛、收敛诊断。
 ---
 
 # Aspen Plus V14 操作技能（aspen-plus-operator）
@@ -15,23 +15,41 @@ description: Aspen Plus V14 自动化建模与 GUI 操作技能（生产实战�
 | bkp 文本层 | 读写 bkp 文本：看结构、修损坏模型 | 即时 | 模型诊断修复、配置速查 |
 | GUI 手工 | 在豆包虚拟桌面打开软件界面操作 | 慢 | 单点操作、教学演示、看引擎报错提示 |
 
-- **通道分界（硬规则）**：GUI 操作必须启动在**豆包虚拟桌面**（用户可见会话）；COM 操作才在本机运行。两者互不感知，以同一个 bkp 文件为交换介质。
+- **通道分界（硬规则）**：GUI 操作必须启动在**用户可见的桌面会话**里（本机真实桌面与远程/虚拟桌面不是同一显示会话，启动错位置用户看不到窗口，等同白启动）；COM 操作才在本机后台运行。两者互不感知，以同一个 bkp 文件为交换介质。
+- **WorkBuddy 环境下**：GUI 通道用 **`workbuddy-computer-use`** skill（点击/输入/截图）；
+  `references/gui-operation.md` 里的「豆包虚拟桌面 / computer_use」是另一套 agent 环境的写法，已加适配说明。
+- **报错文本优先用 COM 取**：`doc.Export(2, "<路径>.rep")`（HAPEXP_REPORT=2）或 `Export(6, …)`（RUNMSG），不必为一个弹窗开 GUI。
 - 批量工作一律 COM；只有看报错提示/单点演示才开 GUI。
 - GUI 启动必须遵守「GUI 启动纪律」（见 references/gui-operation.md）——**禁止用 Bash 直接启动本地 GUI，也禁止把 GUI 启动在本机真实桌面**（用户不可见，等同无效操作）。
 
 ## 工作流
 
 1. **定位模型文件**：`.bkp`（文本，可直接读）。官方完整模型与文本修补模型均可。
+   - **建新模型前**：先查 `references/pattern-library.md` 检索同类流程模式与可复用模板（203 个官方 bkp 已结构化）；
+     物性方法查 `references/property-method-decision.md` 的官方决策树，**别凭印象选**。
+   - **读已有模型的拓扑**：`FLOWSHEET GLOBAL` 段的 `BLOCK BLKID/BLKTYPE/IN/OUT` 自带权威连接关系
+     （203 个官方 bkp 中 129 个可反推），比关键词猜连接可靠得多。
 2. **COM 驱动**：读 `references/com-automation.md`，按「连接 → 改参数 → Reinit → Run2(1) → 轮询 IsRunning → 取数」协议执行。运行序列不能错，漏 Reinit 引擎空转。
 3. **bkp 诊断**：引擎报错（如 ZERO FEED TO THE BLOCK、Required input incomplete）先看 bkp 文本与 GUI 报错对话框，定位根因再改，禁止瞎试参数。见 `references/bkp-diagnostics.md`。
-4. **取数换算（单位集切换，2026-09 实测推翻旧结论）**：Aspen **原生支持 SI 单位集**，不是只能英制。bkp 文本 `"IN-UNITS" INSET = X` 切单位集（已内置 ENG/MET/METCBAR/SI-CBAR/SI）。**COM 读 Output（引擎计算结果）跟随单位集自动换算**：INSET=SI-CBAR 时质量流量直接 kg/hr、摩尔流量 kmol/hr、热负荷 W、温度 °C——**取数零换算**；INSET=SI 时更基准（kg/s、kmol/s、K）。**COM 写 Input（改参数）永远按 bkp 内部英制**（°F/psia/lb/hr/lbmol/hr），单位集只影响读回显示，不影响写。详见 `references/units-si-conversion.md`（含实测对照表）。
+4. **取数换算（单位制，2026-09 复核版）**：Aspen 原生支持 SI，但**别靠"单位集"猜单位**。
+   bkp 文本层每个数值自带 `<维度> <子码>` 两段代码（如 `<22><2>`=°F、`<22><4>`=°C、`<20><2>`=psi、`<20><5>`=bar），
+   **代码是绝对值、可被单个参数覆盖**，单位集是 SI 的文件里也可能有 °F 参数。
+   COM 侧 `IHNode` 有 `UnitString` / `ValueForUnit` / `SetValueAndUnit`（unitcol 是**整数代码**），
+   **取数先回读 `UnitString`、写参用 `SetValueAndUnit` 显式给码**，不必死记换算。
+   完整字典见 `references/units-codebook.md`，工具见 `scripts/aspen_units.py`。
 5. **验证**：结果必须验证——GUI 报告与 COM 取数交叉核对；截图确认界面/弹窗；运行状态确认 converged 而非 ready-但空转。
+   **纯 COM 判定收敛的入口**（看不到 GUI 时用）：
+   `Tree.Data.Results Summary.Run-Status.Output` 下的 **`CVSTAT`**（流程收敛）/ **`SENSSTAT`**（灵敏度/设计规定），
+   取值 `0`=通过 / `1`=错误 / `2`=警告。需要误差细节时把诊断级别调到 5 写 history file，读 `Max Err/Tol < 1.0`。
+   详见 `references/convergence-playbook.md` §1.1、§2.2。
 
 ## 可复用脚本
 
 - `scripts/aspen_com_run_si.py`：**COM 全 SI 封装模板（首选起点）**——业务代码只写 °C/bar/kmol/hr，`set_temp/set_pres/set_flow` 内部转英制；取数 `get_*` 直接返回 kg/hr/kW/°C（需模型 INSET=SI-CBAR）。已验证与引擎真数一致。
 - `scripts/aspen_com_run.py`：COM 批量工况扫描模板（参数化：模型路径、要改的节点、要读的节点、工况表）。
-- `scripts/unit_convert.py`：英制→SI 换算函数库（温度/压力/流量/热负荷/密度/比焓）。
+- `scripts/aspen_units.py`：**单位代码工具**（`probe <bkp>` 统计代码分布、`inset` 查单位集、
+  `sub_value()` 带单位码校验的文本替换、COM 侧 `set_value_with_unit` / `node_value_with_unit`）。
+- `scripts/unit_convert.py`：英制→SI 换算函数库（温度/压力/流量/热负荷/密度/比焓，已逐项复核）。
 - 实战生成器（<workspace>，水解体系示例）：
   - `gen_hydrolysis_f12.py`：单甘油三酯（TRIOLEIN）水解模型生成器（w_o/conv/T/P/flash 参数化）。
   - `gen_hydrolysis_mix.py`：**混合进料双甘油三酯水解生成器**（地沟油/皂角酸化油场景 × 进料温度 × 水油比 × 转化率），场景组成质量 % → 摩尔流量换算，双反应 TRIOLEIN+PPP 同时水解。
@@ -92,7 +110,7 @@ description: Aspen Plus V14 自动化建模与 GUI 操作技能（生产实战�
   | RPLUG | `PARAM TYPE = ADIABATIC LENGTH/DIAM/NPHASE/PHASE/NPOINT` + `PRODUCTS` + `REACTIONS` | 格式已验证 |
 - **引擎实测物理规律**：液体进料过 PUMP 温升极小（90→90.4°F）、COMPR 液体压缩温升小（液不可压）、VALVE 节流 377→300 psia、FSPLIT 无压降、PIPE 压降与管径强相关（2in 管 10m 压降 300+ psia 出口汽化）。
 - **停算判读**：文本层替换后流股 Output 全 None = 块参数格式不被接受（"Required input incomplete"）→ 先核对标准格式（见上表），再考虑 GUI 补参；不要盲改参数。
-- **示例模型库位置**：`C:\Program Files\AspenTech\Aspen Plus V14.0\GUI\Examples\`（67 个 bkp，含生物柴油/水解/精馏等工业案例）——块格式、Design-Spec、Sensitivity 等现成写法从这里抄，别自己发明。
+- **示例模型库位置**：`C:\Program Files\AspenTech\Aspen Plus V14.0\GUI\Examples\`（**203 个 bkp**，24 个分类，含生物柴油/水解/精馏等工业案例）——块格式、Design-Spec、Sensitivity 等现成写法从这里抄，别自己发明。
 
 ### 模块3 收敛与优化（2026-09 实测）
 - **DESIGN-SPEC 完整格式（生物柴油示例，可直接套）**：`? "DESIGN-SPEC" <名> ? ; "SET1_MOLE" ; \ DEFINE FVN = <变量> FVN-VARTYPE = "MASS-FRAC" FVN-STREAM = <流股> FVN-SUBS = MIXED FVN-COMPONEN = <组分> \ \ SPEC EXPR1 = "<变量>" EXPR2 = "<目标值>" \ \ "TOL-SPEC" TOL = "<目标值>*1.0E-4" \ \ VARY VARY-VARTYPE = "STREAM-VAR" VARYSTREAM = <操作流股> VARYSUBS = MIXED VARYVARIABLE = "MASS-FLOW" VARYUOM = "kg/hr" \ \ LIMITS LOWER = "10" UPPER = "1000" \`。四段式：DEFINE（被控量）→ SPEC（目标）→ VARY（操作量）→ LIMITS（限幅）。示例控制"反应器出口甲醇质量分数=0.092，变甲醇进料流量"。
@@ -199,7 +217,10 @@ description: Aspen Plus V14 自动化建模与 GUI 操作技能（生产实战�
 - **SRK 水饱和压低估第三实测点**：混合进料 205 °C / 1.9 MPa（纯水 Psat=1.74 MPa，本应全液相）SRK 给 VFRAC=0.755——坐实 SRK/UNIF-DMD 族对近饱和水体系系统性高估汽化，高压含水体系优先 NRTL。
 
 ### 错误诊断闭环与 COM 读错边界（2026-09 实测）
-- **COM 引擎没有错误文本接口**：`eng.Errors`/`Messages`/`RunStatus` 均不存在；`eng.ControlPanel` 访问抛 com_error（运行前后都试过）；`eng.ExportReport` 参数签名未明（调用报"无效的参数数目"）。**结论：引擎报错文本 COM 读不到，报错第一现场仍是 GUI 控制面板**（打开模型看 Diagnostics/控制面板）——这强化了"COM 出问题→开 GUI 看报错"的必要性。
+- **COM 引擎没有 `Errors`/`Messages`/`RunStatus` 属性**（实测不存在）；`eng.ControlPanel` 访问抛 com_error。
+  **但报错文本可以拿到**：`doc.Export(2, "<path>.rep")`（`HAPEXP_REPORT=2`）或
+  `doc.Export(6, "...")`（`HAPEXP_RUNMSG=6`）直接导出报告/运行消息文件读。
+  （`IHAPEngine.ExportReport(filename, contents, object_id)` 是**三参数**，少传会报"无效的参数数目"。）
 - **"没数"分两种，别混淆**：
   - **流股 Output 全 None = 引擎停算（有错）**：物性缺失/参数错误等，模型根本没算完；
   - **流股 Output = 0.0 = 跑通了但产物为零**：如零进料时 RStoic 静默输出 0，不报错。排错先区分这两种。
@@ -284,11 +305,29 @@ description: Aspen Plus V14 自动化建模与 GUI 操作技能（生产实战�
 
 ## 参考文件（按需读取）
 
-- `references/com-automation.md` — COM 连接、运行协议、变量读写矩阵、能力边界（实测结论）
+- `references/units-codebook.md` — **bkp 单位代码字典**（`<维度> <子码>` 两级结构，203 个官方 bkp 实测统计）
+- `references/units-si-conversion.md` — SI 单位集切换、COM 单位 API、英制→SI 换算表
+- `references/com-automation.md` — COM 连接、运行协议、变量读写矩阵、能力边界（接口签名以类型库为准）
 - `references/bkp-diagnostics.md` — bkp 结构速览、进料段缺失修复、配置提取
 - `references/excel-addins.md` — ASW / APXL / Calc+VBA 三插件选型与要点
 - `references/gui-operation.md` — **GUI 启动纪律、排错、提速、验证**（重要，先读这条）
-- `references/units-si-conversion.md` — 英制/SI 换算表与处理原则
+- `references/property-method-decision.md` — **物性方法选择决策树**（官方帮助原文还原 + 各方法 P/T 边界 + 官方警告）。选方法前读「①快速决策树」「②按体系推荐」两节即可
+- `references/pattern-library.md` — **203 个官方 bkp 流程模式库**：单元操作频率、物性方法分布、高频拓扑组合、25 个可复用模板清单。建新模型前先来检索，别从零发明
+- `references/pattern-index.csv` — 模式库逐文件结构化索引（203 行 × 8 维，UTF-8 BOM，Excel 可开）。**用 Python/Grep 查询，不要整体读**
+- `references/convergence-playbook.md` — **收敛失败诊断与修复手册（72KB，最大）**：诊断决策树、错误消息对照、收敛参数调节、203 个 bkp 收敛配置实测统计。**务必 Grep 定位章节后定向读，禁止整体读入**
+
+> 📖 **大文件读取纪律**：`convergence-playbook.md`（72KB）与 `pattern-index.csv`（45KB）体量大，
+> 先 `grep -n "章节关键词"` 定位行号，再用 Read 的 `offset/limit` 定向读取，避免一次性吃掉几十 K token。
+
+## 未决冲突（待实测裁定，不要当结论用）
+
+- **物性方法与压力的冲突**：官方帮助称**活度系数法压力上限 10 atm、ENRTL-HF 仅 3 atm**，"高压"
+  统一口径 >10 bar 应走高级混合规则 EOS（PRWS/PSRK/SR-POLAR）。而本项目用 **NRTL 跑 2–6 MPa**，
+  超出官方口径 20–60 倍。官方同时明确 **SRK 须配 STEAMNBS**（方向上验证本项目判断），
+  但"SRK 高估汽化率 1.5–2 倍"这个**定量数字官方帮助中查不到**，属本项目实测经验。
+  → 交付结论前**必须做双方法对照并声明方法**，详见 `references/property-method-decision.md` 第⑤节。
+- 官方帮助**未给出"高压 + 羧酸缔合"同时满足的现成方法**（HOC/NHT 是活度系数法配套，撞 10 atm 上限），
+  属官方文档覆盖缺口。油酸体系选方法时须知悉此边界。
 
 ## 关键禁忌
 
@@ -297,6 +336,9 @@ description: Aspen Plus V14 自动化建模与 GUI 操作技能（生产实战�
 - 禁止把 COM 的 `Output\MASSFLOW=1.0` 当流量值（那是报告开关 flag）；组分流量读 `MASSFLOW3\<组分>`。
 - 禁止在未看报错内容前反复试参数；报错先看 GUI 对话框 / bkp / 诊断信息。
 - 流股 TEMP/PRES/ENTHALPY 在 COM 树中不存在，不要尝试读取；温度读上游块 Output（R_TEMP/TEMP，单位随单位集）；**VFRAC 可读**（`Data\Streams\<流股>\Output\VFRAC_OUT\MIXED`，单位集无关）。
-- bkp 单位代码：`<22>`=°F、`<20> <2>`=psi、`<20> <5>`=bar、`<-80>`=kg/hr（BASIS-D/B 的质量单位）、`<-89>`=lbmol/hr。压力单位写错会差 14.5 倍（详见 bkp-diagnostics.md 单位表）。
+- **bkp 单位代码是 `<维度> <子码>` 两级，维度不是单位**：`<22>`=温度（`<1>`K / `<2>`°F / `<3>`K / `<4>`°C）、`<20>`=压力（`<1>`Pa / `<2>`psi / `<3>`atm / `<5>`bar / `<10>`kPa / `<20>`MPa）、`<-80>` 质量流量、`<-89>` 摩尔流量。**不能由单位集推断代码**（存在 SI 文件里带 °F 参数），必须读数值自带的代码；`<20><2>` 与 `<20><5>` 差 14.5038 倍。详见 `references/units-codebook.md`。
+- **COM 取数必须回读 `UnitString`**，写参用 `SetValueAndUnit(值, 整数码)`（不是 "C"/"bar" 字符串）；写完再回读校验一次。
+- **MET 单位集的温度是 K 不是 °C**（METCBAR 才是 °C），两者只差一个压力单位却差 273。
+- `Reinit` 在 `SuppressDialogs=True` 下优先 `Engine.Reinit()`（官方 V7.3 兼容性说明：`HappLS.Reinit()` 在抑制对话框时有不真正 reinit 的 bug）；`Run2` 一律写 `Run2(1)` 并轮询 `IsRunning`。
 - 塔不收敛先查：进料温度是否高于轻组分泡点、D/RR 规格是否超出塔板能力（12 板油酸/硬脂酸体系收率只能到 50–76%）、重组分是否过重（MW>600 的甘油酯会使塔底温度爆表）。
 - 组分替换必须同步改 `ANAME / DBNAME1 / ANAME1` 三件套，否则引擎按旧分子式算分子量，物料平衡假性错乱。
